@@ -1,5 +1,6 @@
 import os
 import requests
+from urllib.parse import urlparse
 from flask import Flask, jsonify, request
 from dotenv import load_dotenv
 
@@ -10,6 +11,23 @@ app = Flask(__name__)
 BOT_TOKEN = os.getenv("BOT_TOKEN", "")
 WEBHOOK_PATH = os.getenv("WEBHOOK_PATH", "/telegram")
 PORT = int(os.getenv("PORT", "5000"))
+
+
+def normalize_webhook_path(value: str) -> str:
+    if not value:
+        return "/telegram"
+
+    parsed = urlparse(value)
+    if parsed.scheme and parsed.netloc:
+        return parsed.path or "/telegram"
+
+    if not value.startswith("/"):
+        return f"/{value}"
+
+    return value
+
+
+WEBHOOK_PATH = normalize_webhook_path(WEBHOOK_PATH)
 
 
 def send_message(chat_id: int, text: str) -> None:

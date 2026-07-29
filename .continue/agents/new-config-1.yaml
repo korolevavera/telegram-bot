@@ -1,0 +1,21 @@
+{
+  "models": [
+    {
+      "name": "single_find_and_replace",
+  "arguments": {
+    "filepath": "src/main.py",
+        "new_string": "\n# Блок автоматической установки вебхука при старте на Railway\nimport os, time\nif os.getenv('RAILWAY_ENVIRONMENT') or os.getenv('RAILWAY_SERVICE_NAME'):time.sleep(3)  # Даем время подняться сети\ntry:\n    # Генерируем URL сервиса\n    railway_url = f'https://{os.getenv('RAILWAY_SERVICE_NAME')}.up.railway.app'\n    webhook_url = railway_url + '/telegram'\n    # Удаляем старый вебхук и ставим новый\n    bot.remove_webhook()\n    if bot.set_webhook(url=webhook_url):\n        print(f'✅ Вебхук автоматически установлен на {webhook_url}')\n    else:\n        print('❌ Ошибка при автоматической установке вебхука.')\nexcept Exception as e:\n    print(f'⚠️ Не удалось установить вебхук при старте: {e}')",
+    "old_string": "\ndef telegram_webhook():",
+    "replace_all": true
+  }
+}
+  ],
+  "arguments": {
+    "filepath": "src/main.py",
+    "new_string": "// ... existing code ...\n\nif __name__ == '__main__':\n    # Блок автоматической установки вебхука при старте на Railway\nimport os, time\nif os.getenv('RAILWAY_ENVIRONMENT') or os.getenv('RAILWAY_SERVICE_NAME'):time.sleep(3)  # Даем время подняться сети\ntry:\n    # Генерируем URL сервиса\n    railway_url = f'https://{os.getenv('RAILWAY_SERVICE_NAME')}.up.railway.app'\n    webhook_url = railway_url + '/telegram'\n    # Удаляем старый вебхук и ставим новый\n    bot.remove_webhook()\n    if bot.set_webhook(url=webhook_url):\n        print(f'✅ Вебхук автоматически установлен на {webhook_url}')\n    else:\n        print('❌ Ошибка при автоматической установке вебхука.')\nexcept Exception as e:\n    print(f'⚠️ Не удалось установить вебхук при старте: {e}')",
+    "old_string": "\ndef telegram_webhook():",
+    "replace_all": true
+  }
+}
+}
+

@@ -77,4 +77,29 @@ def telegram_webhook():
 
 
 if __name__ == "__main__":
+    # Блок автоматической установки вебхука при старте на Railway
+    import time
+    railway_service = os.getenv('RAILWAY_SERVICE_NAME')
+    railway_env = os.getenv('RAILWAY_ENVIRONMENT')
+    
+    if railway_env or railway_service:
+        time.sleep(3)  # Даем время подняться сети
+        try:
+            # Динамически генерируем URL, используя переменные окружения Railway
+            railway_url = f"https://{railway_service}.up.railway.app"
+            # Берем путь WEBHOOK_PATH, который у тебя уже настроен как /telegram
+            full_webhook_url = railway_url + WEBHOOK_PATH
+            
+            # Устанавливаем вебхук
+            import requests
+            url = f"https://api.telegram.org/bot{BOT_TOKEN}/setWebhook?url={full_webhook_url}"
+            response = requests.get(url)
+            if response.json().get('ok'):
+                print(f"✅ Вебхук автоматически установлен на {full_webhook_url}")
+            else:
+                print(f"❌ Ошибка при установке вебхука: {response.json()}")
+        except Exception as e:
+            print(f"⚠️ Не удалось установить вебхук при старте: {e}")
+
+    # Запуск самого сервера
     app.run(host="0.0.0.0", port=PORT, debug=False)

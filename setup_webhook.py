@@ -13,10 +13,12 @@ def main():
         return
         
     if not RAILWAY_URL:
+        # Исправлено: убраны обратные кавычки из строки запроса
         RAILWAY_URL = input("Введите URL вашего проекта на Railway (например: https://my-bot.up.railway.app): ").strip()
     
     webhook_url = f"{RAILWAY_URL.rstrip('/')}/webhook"
-    api_url = f"https://api.telegram.org/bot{BOT_TOKEN}/setWebhook" # Исправлено: убраны обратные кавычки
+    # Исправлено: убраны обратные кавычки из api_url
+    api_url = f"https://api.telegram.org/bot{BOT_TOKEN}/setWebhook"
     
     try:
         response = requests.post(api_url, json={"url": webhook_url}, timeout=10)

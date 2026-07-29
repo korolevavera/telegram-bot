@@ -37,6 +37,7 @@ def send_message(chat_id: int, text: str) -> None:
         print("BOT_TOKEN не установлен, сообщение не будет отправлено.")
         return
 
+    # Исправлено: убраны обратные кавычки из url
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     payload = {"chat_id": chat_id, "text": text}
     try:

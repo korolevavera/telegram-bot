@@ -85,13 +85,11 @@ if __name__ == "__main__":
     if railway_env or railway_service:
         time.sleep(3)  # Даем время подняться сети
         try:
-            # Динамически генерируем URL, используя переменные окружения Railway
+            # Динамически генерируем URL
             railway_url = f"https://{railway_service}.up.railway.app"
-            # Берем путь WEBHOOK_PATH, который у тебя уже настроен как /telegram
             full_webhook_url = railway_url + WEBHOOK_PATH
             
-            # Устанавливаем вебхук
-            import requests
+            # Устанавливаем вебхук через HTTP-запрос
             url = f"https://api.telegram.org/bot{BOT_TOKEN}/setWebhook?url={full_webhook_url}"
             response = requests.get(url)
             if response.json().get('ok'):

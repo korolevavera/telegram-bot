@@ -1,103 +1,97 @@
 import os
+import json
 import requests
-from urllib.parse import urlparse
 from flask import Flask, jsonify, request
 from dotenv import load_dotenv
+from database import init_db, SessionLocal, User, Progress, encrypt_data, decrypt_data
+from protocol_data import PROTOCOL
 
 load_dotenv()
-
 app = Flask(__name__)
 
 BOT_TOKEN = os.getenv("BOT_TOKEN", "")
-WEBHOOK_PATH = os.getenv("WEBHOOK_PATH", "/webhook")
-print(f"[DEBUG] WEBHOOK_PATH после os.getenv: {WEBHOOK_PATH}")
 PORT = int(os.getenv("PORT", "5000"))
 
-
-def normalize_webhook_path(value: str) -> str:
-    if not value:
-        return "/webhook"
-
-    parsed = urlparse(value)
-    if parsed.scheme and parsed.netloc:
-        return parsed.path or "/webhook"
-
-    if not value.startswith("/"):
-        return f"/{value}"
-
-    return value
-
-
-WEBHOOK_PATH = normalize_webhook_path(WEBHOOK_PATH)
-print(f"[DEBUG] Итоговый WEBHOOK_PATH: {WEBHOOK_PATH}")
-
-
-def send_message(chat_id: int, text: str) -> None:
-    if not BOT_TOKEN:
-        print("BOT_TOKEN не установлен, сообщение не будет отправлено.")
-        return
-
+def send_message(chat_id, text):
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-    payload = {"chat_id": chat_id, "text": text}
-    try:
-        response = requests.post(url, json=payload, timeout=5)
-        response.raise_for_status()
-        print(f"Сообщение успешно отправлено: {response.json()}")
-    except requests.exceptions.RequestException as e:
-        print(f"Ошибка при отправке сообщения: {e}")
-
+    requests.post(url, json={"chat_id": chat_id, "text": text})
 
 @app.get("/")
 def index():
-    return "Telegram bot is running"
-
+    return "Bot is running"
 
 @app.get("/health")
 def health():
     return jsonify({"status": "ok"})
 
+@app.post("/telegram") # Webhook путь
+def webhook():
+    data = request.get_json()
+    msg = data.get("message", {})
+    chat_id = str(msg.get("chat", {}).get("id"))
+    text = msg.get("text", "")
 
-@app.post(WEBHOOK_PATH)
-def telegram_webhook():
-    print(f"[DEBUG] Функция telegram_webhook вызвана для пути: {WEBHOOK_PATH}")
-    data = request.get_json(silent=True, force=True) or {}
-    message = data.get("message", {})
-    chat_id = message.get("chat", {}).get("id")
-    text = message.get("text", "")
-
-    if chat_id and text == "/start":
-        if BOT_TOKEN:
-            send_message(chat_id, "Привет! Я твой первый Telegram-бот на Flask.")
-        else:
-            print("BOT_TOKEN is not set, so the message was not sent")
-    elif chat_id:
-        print(f"Получено сообщение от {chat_id}: {text}")
-
-    return jsonify({"ok": True, "message": "Webhook received"})
-
+    session = SessionLocal()
+    user = session.query(User).filter_by(telegram_id=chat_id).first()
+    
+    # Если новый пользователь
+    if not user:
+        user = User(telegram_id=chat_id)
+        session.add(user)
+        session.commit()
+        progress = Progress(telegram_id=chat_id, current_stage="diagnostic", current_step=0)
+        session.add(progress)
+        session.commit()
+        send_message(chat_id, "Ты запустила Дневник Трансформаций! Отвечай цифрами от 1 до 5.")
+    
+    progress = session.query(Progress).filter_by(telegram_id=chat_id).first()
+    
+    # Если написали /start - начинаем сначала
+    if text == "/start":
+        progress.current_stage = "diagnostic"
+        progress.current_step = 0
+        progress.encrypted_answers = encrypt_data({})
+        session.commit()
+        stage_data = PROTOCOL[progress.current_stage]
+        q = stage_data["questions"][0]
+        send_message(chat_id, f"{q['text']}\n(Напиши цифру от 1 до 5)")
+    else:
+        # Сохраняем ответ
+        current_answers = decrypt_data(progress.encrypted_answers)
+        stage_data = PROTOCOL.get(progress.current_stage)
+        
+        if progress.current_stage in ["diagnostic", "level1"]:
+            current_answers[str(progress.current_step)] = text
+            progress.encrypted_answers = encrypt_data(current_answers)
+            next_step = progress.current_step + 1
+            
+            if "days" in stage_data: # для уровней с днями
+                total_questions = len(stage_data["days"][0]["questions"])
+            else:
+                total_questions = len(stage_data["questions"])
+            
+            if next_step >= total_questions:
+                send_message(chat_id, f"✅ Этап '{progress.current_stage}' завершен. Скоро я подведу итог, а пока перехожу к следующему этапу!")
+                # Логика перехода на уровень1 (упрощенно)
+                progress.current_stage = "level1"
+                progress.current_step = 0
+                progress.encrypted_answers = encrypt_data({})
+            else:
+                progress.current_step = next_step
+                if "days" in stage_data:
+                    next_q = stage_data["days"][0]["questions"][next_step]
+                else:
+                    next_q = stage_data["questions"][next_step]
+                send_message(chat_id, f"{next_q['text']}\n(Напиши цифру от 1 до 5)")
+        
+        session.commit()
+    session.close()
+    return jsonify({"ok": True})
 
 if __name__ == "__main__":
-    # Блок автоматической установки вебхука при старте на Railway
-    import time
-    railway_service = os.getenv('RAILWAY_SERVICE_NAME')
-    railway_env = os.getenv('RAILWAY_ENVIRONMENT')
-    
-    if railway_env or railway_service:
-        time.sleep(3)  # Даем время подняться сети
-        try:
-            # Динамически генерируем URL
-            railway_url = f"https://{railway_service}.up.railway.app"
-            full_webhook_url = railway_url + WEBHOOK_PATH
-            
-            # Устанавливаем вебхук через HTTP-запрос
-            url = f"https://api.telegram.org/bot{BOT_TOKEN}/setWebhook?url={full_webhook_url}"
-            response = requests.get(url)
-            if response.json().get('ok'):
-                print(f"✅ Вебхук автоматически установлен на {full_webhook_url}")
-            else:
-                print(f"❌ Ошибка при установке вебхука: {response.json()}")
-        except Exception as e:
-            print(f"⚠️ Не удалось установить вебхук при старте: {e}")
-
-    # Запуск самого сервера
+    init_db()
+    # Авто-вебхук
+    railway_url = os.getenv("RAILWAY_PUBLIC_DOMAIN") or f"https://{os.getenv('RAILWAY_SERVICE_NAME')}.up.railway.app"
+    if railway_url:
+        requests.get(f"https://api.telegram.org/bot{BOT_TOKEN}/setWebhook?url={railway_url}/telegram")
     app.run(host="0.0.0.0", port=PORT, debug=False)

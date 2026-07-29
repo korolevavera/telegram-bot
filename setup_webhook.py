@@ -13,27 +13,24 @@ def main():
         return
         
     if not RAILWAY_URL:
-        # Исправлено: убраны обратные кавычки из строки запроса
         RAILWAY_URL = input("Введите URL вашего проекта на Railway (например: https://my-bot.up.railway.app): ").strip()
     
     webhook_url = f"{RAILWAY_URL.rstrip('/')}/webhook"
-    # Исправлено: убраны обратные кавычки из api_url
     api_url = f"https://api.telegram.org/bot{BOT_TOKEN}/setWebhook"
     
     try:
         response = requests.post(api_url, json={"url": webhook_url}, timeout=10)
-        response.raise_for_status() # Добавлено для явной обработки HTTP ошибок (например, 404, 500)
+        response.raise_for_status()
         
         if response.ok:
             print(f"✅ Вебхук успешно установлен!")
             print(f"   URL: {webhook_url}")
             print("   Теперь бот будет получать все сообщения из Telegram!")
         else:
-            # Это условие уже покрывается raise_for_status(), но оставим для ясности
             print(f"❌ Ошибка: {response.text}")
-    except requests.exceptions.RequestException as e: # Более специфичная обработка ошибок, связанных с запросами
+    except requests.exceptions.RequestException as e:
         print(f"❌ Ошибка подключения или HTTP-ошибка при установке вебхука: {str(e)}")
-    except Exception as e: # Общая обработка других неожиданных ошибок
+    except Exception as e:
         print(f"❌ Неизвестная ошибка при установке вебхука: {str(e)}")
 
 if __name__ == "__main__":
